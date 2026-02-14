@@ -37,10 +37,11 @@ func TestRequestLineParse(t *testing.T) {
 	})
 
 	t.Run("Invalid number of parts", func(t *testing.T) {
+		s := "/coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n"
 		_, err := RequestFromReader(
 			&chunkReader{
-				data:            "/coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
-				numBytesPerRead: 4,
+				data:            s,
+				numBytesPerRead: len(s),
 			},
 		)
 		require.Error(t, err)
@@ -65,6 +66,35 @@ func TestRequestLineParse(t *testing.T) {
 		_, err := RequestFromReader(strings.NewReader("get /coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n"))
 		require.Error(t, err)
 	})
+
+	t.Run("EOF with last bytes", func(t *testing.T) {
+		reader := &eofReader{
+			data: "GET / HTTP/1.1\r\n\r\n",
+		}
+		r, err := RequestFromReader(reader)
+		require.NoError(t, err)
+		require.NotNil(t, r)
+		assert.Equal(t, "GET", r.RequestLine.Method)
+		assert.Equal(t, "/", r.RequestLine.RequestTarget)
+		assert.Equal(t, "1.1", r.RequestLine.HttpVersion)
+	})
+}
+
+type eofReader struct {
+	data string
+	pos  int
+}
+
+func (r *eofReader) Read(p []byte) (n int, err error) {
+	if r.pos >= len(r.data) {
+		return 0, io.EOF
+	}
+	n = copy(p, r.data[r.pos:])
+	r.pos += n
+	if r.pos >= len(r.data) {
+		return n, io.EOF
+	}
+	return n, nil
 }
 
 type chunkReader struct {
