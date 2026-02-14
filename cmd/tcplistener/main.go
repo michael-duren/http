@@ -38,7 +38,7 @@ func main() {
 		fmt.Println("connection accepted lets go")
 		ch := getLinesChannel(conn)
 		for s := range ch {
-			fmt.Printf("read: %s\n", s)
+			fmt.Printf("%s\n", s)
 		}
 	}
 }
@@ -55,12 +55,17 @@ func getLinesChannel(r io.ReadCloser) <-chan string {
 		sb := strings.Builder{}
 		for {
 			buf := make([]byte, 8)
-			_, err := r.Read(buf)
+			n, err := r.Read(buf)
 			if err != nil {
 				if err == io.EOF {
-					s := readLine(buf, &sb)
+					s := readLine(buf[:n], &sb)
 					if s != nil {
 						ch <- *s
+					}
+
+					remaining := sb.String()
+					if len(remaining) > 0 {
+						ch <- remaining
 					}
 					break
 				}
@@ -68,7 +73,7 @@ func getLinesChannel(r io.ReadCloser) <-chan string {
 				os.Exit(1)
 			}
 
-			s := readLine(buf, &sb)
+			s := readLine(buf[:n], &sb)
 			if s != nil {
 				ch <- *s
 			}
