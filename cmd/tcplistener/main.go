@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"io"
+	"log/slog"
 	"net"
 	"os"
-	"strings"
+
+	"github.com/michael-duren/http/internal/request"
 )
 
 // const filename = "messages.txt"
@@ -36,66 +37,78 @@ func main() {
 		}
 
 		fmt.Println("connection accepted lets go")
-		ch := getLinesChannel(conn)
-		for s := range ch {
-			fmt.Printf("%s\n", s)
+
+		req, err := request.RequestFromReader(conn)
+		if err != nil {
+			slog.Error("reading request from conn", "err", err)
+			conn.Close()
+			continue
 		}
+		fmt.Printf("Request line:\n")
+		fmt.Printf("- Method: %s\n", req.RequestLine.Method)
+		fmt.Printf("- Target: %s\n", req.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", req.RequestLine.HttpVersion)
+
+		// ch := getLinesChannel(conn)
+		// for s := range ch {
+		// 	fmt.Printf("%s\n", s)
+		// }
 	}
 }
 
-func getLinesChannel(r io.ReadCloser) <-chan string {
-	ch := make(chan string)
-
-	go func() {
-		defer func() {
-			defer r.Close()
-			close(ch)
-			fmt.Println("closing channel and reader")
-		}()
-		sb := strings.Builder{}
-		for {
-			buf := make([]byte, 8)
-			n, err := r.Read(buf)
-			if err != nil {
-				if err == io.EOF {
-					s := readLine(buf[:n], &sb)
-					if s != nil {
-						ch <- *s
-					}
-
-					remaining := sb.String()
-					if len(remaining) > 0 {
-						ch <- remaining
-					}
-					break
-				}
-				fmt.Println("error reading from file: ", err)
-				os.Exit(1)
-			}
-
-			s := readLine(buf[:n], &sb)
-			if s != nil {
-				ch <- *s
-			}
-		}
-
-	}()
-	return ch
-}
-
-func readLine(b []byte, sb *strings.Builder) *string {
-	if i := strings.Index(string(b), "\n"); i >= 0 {
-		sb.Write(b[:i])
-		s := sb.String()
-		sb.Reset()
-
-		if i+1 < len(b) {
-			sb.Write(b[i+1:])
-		}
-
-		return &s
-	}
-
-	sb.Write(b)
-	return nil
-}
+// func getLinesChannel(r io.ReadCloser) <-chan string {
+// 	ch := make(chan string)
+//
+// 	go func() {
+// 		defer func() {
+// 			defer r.Close()
+// 			close(ch)
+// 			fmt.Println("closing channel and reader")
+// 		}()
+// 		sb := strings.Builder{}
+// 		for {
+// 			buf := make([]byte, 8)
+// 			n, err := r.Read(buf)
+// 			if err != nil {
+// 				if err == io.EOF {
+// 					s := readLine(buf[:n], &sb)
+// 					if s != nil {
+// 						ch <- *s
+// 					}
+//
+// 					remaining := sb.String()
+// 					if len(remaining) > 0 {
+// 						ch <- remaining
+// 					}
+// 					break
+// 				}
+// 				fmt.Println("error reading from file: ", err)
+// 				os.Exit(1)
+// 			}
+//
+// 			s := readLine(buf[:n], &sb)
+// 			if s != nil {
+// 				ch <- *s
+// 			}
+// 		}
+//
+// 	}()
+// 	return ch
+// }
+//
+// func readLine(b []byte, sb *strings.Builder) *string {
+// 	if i := strings.Index(string(b), "\n"); i >= 0 {
+// 		sb.Write(b[:i])
+// 		s := sb.String()
+// 		sb.Reset()
+//
+// 		if i+1 < len(b) {
+// 			sb.Write(b[i+1:])
+// 		}
+//
+// 		return &s
+// 	}
+//
+// 	sb.Write(b)
+// 	return nil
+// }

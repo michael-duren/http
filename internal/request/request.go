@@ -61,12 +61,11 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		}
 
 		numBytesRead, readErr := reader.Read(buf[readToIndex:])
-		// if we're not at eof
+
 		if readErr != nil && !errors.Is(readErr, io.EOF) {
 			return nil, readErr
 		}
 
-		// continue parse
 		readToIndex += numBytesRead
 
 		numBytesParsed, parseErr := req.parse(buf[:readToIndex])
