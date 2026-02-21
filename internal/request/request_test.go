@@ -80,6 +80,67 @@ func TestRequestLineParse(t *testing.T) {
 	})
 }
 
+func TestHeaderParse(t *testing.T) {
+	t.Run("Standard Headers", func(t *testing.T) {
+		reader := &chunkReader{
+			data:            "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
+			numBytesPerRead: 3,
+		}
+		r, err := RequestFromReader(reader)
+		require.NoError(t, err)
+		require.NotNil(t, r)
+		assert.Equal(t, "localhost:42069", r.Headers["host"])
+		assert.Equal(t, "curl/7.81.0", r.Headers["user-agent"])
+		assert.Equal(t, "*/*", r.Headers["accept"])
+	})
+	t.Run("Malformed Header", func(t *testing.T) {
+		reader := &chunkReader{
+			data:            "GET / HTTP/1.1\r\nHost localhost:42069\r\n\r\n",
+			numBytesPerRead: 3,
+		}
+		_, err := RequestFromReader(reader)
+		require.Error(t, err)
+	})
+	t.Run("Empty Headers", func(t *testing.T) {
+		reader := &chunkReader{
+			data:            "GET / HTTP/1.1\r\n\r\n",
+			numBytesPerRead: 3,
+		}
+		r, err := RequestFromReader(reader)
+		require.NoError(t, err)
+		require.Equal(t, len(r.Headers), 0)
+	})
+	t.Run("Duplicate headers", func(t *testing.T) {
+		reader := &chunkReader{
+			data:            "GET / HTTP/1.1\r\nLocation: 123\r\nLocation: 456\r\n\r\n",
+			numBytesPerRead: 30,
+		}
+		r, err := RequestFromReader(reader)
+		require.NoError(t, err)
+		require.Equal(t, "123,456", r.Headers["location"])
+	})
+
+	t.Run("Case insensitive", func(t *testing.T) {
+		reader := &chunkReader{
+			data:            "GET / HTTP/1.1\r\nLOCATION: 123\r\nlocation: 456\r\n\r\n",
+			numBytesPerRead: 12,
+		}
+		r, err := RequestFromReader(reader)
+		require.NoError(t, err)
+		require.Equal(t, "123,456", r.Headers["location"])
+	})
+
+	t.Run("Multiple headers in one line", func(t *testing.T) {
+		reader := &chunkReader{
+			data:            "GET / HTTP/1.1\r\nLOCATION: 123\r\nlocation: 456\r\nlocation: 456\r\nlocation: 456\r\nlocation: 456\r\n\r\n",
+			numBytesPerRead: 80,
+		}
+		r, err := RequestFromReader(reader)
+		require.NoError(t, err)
+		require.Equal(t, "123,456,456,456,456", r.Headers["location"])
+	})
+}
+
 type eofReader struct {
 	data string
 	pos  int

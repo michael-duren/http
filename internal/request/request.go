@@ -8,11 +8,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/michael-duren/http/internal/headers"
 	"github.com/michael-duren/http/internal/parsing"
 )
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     headers.Headers
 
 	state requestState
 }
@@ -27,6 +29,7 @@ type requestState int
 
 const (
 	requestStateInitialized requestState = iota
+	requestStateParsingHeaders
 	requestStateDone
 )
 
@@ -50,7 +53,8 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	buf := make([]byte, bufferSize)
 	readToIndex := 0
 	req := &Request{
-		state: requestStateInitialized,
+		state:   requestStateInitialized,
+		Headers: headers.NewHeaders(),
 	}
 	for req.state != requestStateDone {
 		// we need to increase buffer size to handle
@@ -150,8 +154,14 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, nil
 		}
 		r.RequestLine = *requestLine
-		r.state = requestStateDone
+		r.state = requestStateParsingHeaders
 		return n, nil
+	case requestStateParsingHeaders:
+		read, done, err := r.Headers.Parse(data)
+		if done {
+			r.state = requestStateDone
+		}
+		return read, err
 	case requestStateDone:
 		return 0, errors.New("error: trying to read data in a done state")
 	default:
