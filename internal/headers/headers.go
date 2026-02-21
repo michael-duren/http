@@ -33,13 +33,18 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, fmt.Errorf("no key value separator in header string %s", string(data))
 	}
 
-	key := string(data[:separatorIdx])
+	key := strings.ToLower(string(data[:separatorIdx]))
 	value := strings.Trim(string(line[(separatorIdx+1):]), " ")
 	if !isValidKey(key) {
 		return 0, false, fmt.Errorf("invalid key: %s", key)
 	}
 
-	h[strings.ToLower(key)] = value
+	if prevVal, exists := h[key]; exists {
+		h[key] = fmt.Sprintf("%s,%s", prevVal, value)
+	} else {
+		h[key] = value
+	}
+
 	return rn + 2, false, nil
 }
 

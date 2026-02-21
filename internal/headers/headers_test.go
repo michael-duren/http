@@ -47,4 +47,13 @@ func TestParse(t *testing.T) {
 		assert.Equal(t, 0, n)
 		assert.False(t, done)
 	})
+
+	t.Run("Handles appending values to already existing keys", func(t *testing.T) {
+		headers := NewHeaders()
+		headers["host"] = "localhost:69"
+		data := []byte("Host: localhost:42069\r\n\r\n")
+		_, _, err := headers.Parse(data)
+		require.NoError(t, err)
+		assert.Equal(t, "localhost:69,localhost:42069", headers["host"])
+	})
 }
