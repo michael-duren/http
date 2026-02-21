@@ -7,6 +7,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+
+	"github.com/michael-duren/http/internal/parsing"
 )
 
 type Request struct {
@@ -28,7 +30,6 @@ const (
 	requestStateDone
 )
 
-const clrf = "\r\n"
 const bufferSize = 32
 
 const (
@@ -93,7 +94,7 @@ func isValidMethod(m string) bool {
 }
 
 func parseRequestLine(data []byte) (*RequestLine, int, error) {
-	idx := bytes.Index(data, []byte(clrf))
+	idx := bytes.Index(data, []byte(parsing.CLRF))
 	if idx == -1 {
 		return nil, 0, nil
 	}
